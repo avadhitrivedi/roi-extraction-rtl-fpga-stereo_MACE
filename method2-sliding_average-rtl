@@ -1,0 +1,481 @@
+module method2(
+input wrclk_p,
+input wrclk_n,
+input rst_1,
+input start_rd,
+input start_rd2,
+output q,
+output q2,
+output q3
+);
+
+wire[15:0] s;
+wire[15:0] s2;
+wire[15:0] s3;
+
+reg[15:0] data=0;  
+reg[15:0] data2=0; 
+reg[15:0] data3=0;
+
+reg[9:0] wraddress=0;
+reg[9:0] rdaddress=0; 
+reg[8:0] wraddress2=0;
+reg[8:0] rdaddress2=0;
+reg[2:0] wraddress3=0;
+reg[2:0] rdaddress3=0;
+reg[9:0] initial_rdaddress=0;
+reg[3:0] initial_roi_wraddress3=0;
+
+reg read_done=0;
+reg read_done2=0;
+
+reg write_enable=0;
+reg read_enable=0;
+reg write_enable2=0;
+reg read_enable2=0;
+reg write_enable3=0;
+reg read_enable3=0;
+
+reg[19:0] sum=0;
+reg[19:0] average=0;
+
+reg[7:0] cnt_read1=0;
+reg[9:0] cnt_read2=0;
+reg[5:0] cnt_read3=0;
+reg[3:0] cnt_idle2=0;
+reg[3:0] channel_cnt=0;
+
+reg[3:0] state;
+reg[3:0] state_2;
+reg[3:0] state_3;
+
+reg flag1=0;  //start writing roi in ram2
+reg flag2=0; //writting roi in ram2 complete
+
+reg[15:0] temp[0:4];
+
+parameter   START=4'b0000,
+            NEXT=4'b0001,
+            NEXT2=4'b0010,
+            NEXT3=4'b0011,
+            NEXT4=4'b0100,
+            NEXT5=4'b0101,
+            NEXT6=4'b0110,
+            NEXT7=4'b0111,
+            NEXT8=4'b1000,
+            READ_DONE_HIGH=4'b1001,
+            READ_ENABLE_LOW=4'b1010,
+            READ_DONE_LOW=4'b1011;
+
+parameter   CONDITION=4'b0000,
+            STATE=4'b0001,
+            STATE2=4'b0010,
+            STATE3=4'b0011,
+            STATE4=4'b0100,
+            STATE5=4'b0101,
+            STATE6=4'b0110,
+            STATE7=4'b0111,
+            STATE8=4'b1000;
+                        
+parameter   CONDITION1_READ2=4'b0000,
+            CONDITION2_READ2=4'b0001,
+            READ_ENABLE2_HIGH=4'b0010,
+            READ_2=4'b0011,
+            IDLE2=4'b0100,
+            READ_DONE2_HIGH=4'b0101,
+            READ_ENABLE2_LOW=4'b0110,
+            READ_DONE2_LOW=4'b0111;
+
+parameter   threshold = 16'b0000_0000_1001_0001;
+parameter   x = 10'b00_0111_1001;
+
+wire wrclk;
+IBUFDS clkin1_buf
+  (.O  (wrclk),
+   .I  (wrclk_p),
+   .IB (wrclk_n));
+
+ila_0 dut (
+	.clk(wrclk), // input wire clk
+
+
+	.probe0(rst_1), // input wire [0:0]  probe0  
+	.probe1(start_rd), // input wire [0:0]  probe1 
+	.probe2(start_rd2), // input wire [0:0]  probe2 
+	.probe3(data2), // input wire [15:0]  probe3 
+	.probe4(data3), // input wire [15:0]  probe4 
+	.probe5(s), // input wire [15:0]  probe5 
+	.probe6(s2), // input wire [15:0]  probe6 
+	.probe7(s3), // input wire [15:0]  probe7 
+	.probe8(rdaddress), // input wire [9:0]  probe8 
+	.probe9(wraddress2), // input wire [8:0]  probe9 
+	.probe10(rdaddress2), // input wire [8:0]  probe10 
+	.probe11(wraddress3), // input wire [2:0]  probe11 
+	.probe12(rdaddress3), // input wire [2:0]  probe12 
+	.probe13(initial_rdaddress), // input wire [9:0]  probe13 
+	.probe14(initial_roi_wraddress), // input wire [3:0]  probe14 
+	.probe15(read_done), // input wire [0:0]  probe15 
+	.probe16(write_done2), // input wire [0:0]  probe16 
+	.probe17(read_done2), // input wire [0:0]  probe17 
+	.probe18(write_enable), // input wire [0:0]  probe18 
+	.probe19(read_enable), // input wire [0:0]  probe19 
+	.probe20(write_enable2), // input wire [0:0]  probe20 
+	.probe21(read_enable2), // input wire [0:0]  probe21 
+	.probe22(write_enable3), // input wire [0:0]  probe22 
+	.probe23(read_enable3), // input wire [0:0]  probe23 
+	.probe24(sum), // input wire [19:0]  probe24 
+	.probe25(average), // input wire [19:0]  probe25 
+	.probe26(cnt_read1), // input wire [9:0]  probe26 
+	.probe27(cnt_read2), // input wire [9:0]  probe27 
+	.probe28(cnt_read3), // input wire [9:0]  probe28 
+	.probe29(cnt_idle2), // input wire [3:0]  probe29 
+	.probe30(channel_cnt), // input wire [3:0]  probe30 
+	.probe31(cnt_wait), // input wire [1:0]  probe31 
+	.probe32(state_2), // input wire [4:0]  probe32 
+	.probe33(state) // input wire [3:0]  probe33
+);
+
+
+always @(posedge wrclk,posedge rst_1)begin
+if(rst_1)begin
+wraddress<=0;
+rdaddress<=0;
+wraddress3<=0;
+write_enable<=0;
+write_enable3<=0;
+read_enable<=0;
+cnt_read1<=0;
+average<=0;
+initial_rdaddress<=0;
+channel_cnt<=0;
+temp[0]<=0;
+temp[1]<=0;
+temp[2]<=0;
+temp[3]<=0;
+temp[4]<=0;
+state<=START;
+end
+
+else if(wrclk)begin
+case(state)
+
+START:begin
+wraddress<=0;
+rdaddress<=0;
+read_enable<=0;
+wraddress3<=0;
+write_enable3<=0;
+write_enable<=0;
+channel_cnt<=0;
+cnt_read1<=0;
+average<=0;
+initial_rdaddress<=0;
+temp[0]<=0;
+temp[1]<=0;
+temp[2]<=0;
+temp[3]<=0;
+temp[4]<=0;
+if(start_rd==1)begin
+read_enable<=1;
+write_enable3<=1;
+state<=NEXT;
+end
+else
+state<=START;
+end
+
+NEXT:begin
+state<=NEXT2;
+end
+
+NEXT2:begin
+{temp[0],temp[1],temp[2],temp[3],temp[4]}<={s,temp[0],temp[1],temp[2],temp[3]};
+sum<=s+temp[0]+temp[1]+temp[2]+temp[3];
+rdaddress<=rdaddress+1;
+cnt_read1<=cnt_read1+1;
+if(average>=threshold)begin
+flag1<=1;
+rdaddress<=rdaddress+1;
+state<=NEXT6;
+end
+else
+state<=NEXT3;
+end
+
+NEXT3:begin
+average<=(sum*13)>>6;
+initial_roi_wraddress3<=wraddress3;
+state<=NEXT2;
+if(cnt_read1==1)begin
+data3<=s;
+end
+else begin
+wraddress3<=wraddress3+1;
+data3<=s;
+end
+end
+
+NEXT6:begin
+data3<=s;
+wraddress3<=wraddress3+1;
+rdaddress<=rdaddress+1;
+state<=NEXT7;
+end
+
+NEXT7:begin
+state<=NEXT4;
+rdaddress<=rdaddress+1;
+end
+
+NEXT4:begin
+if(flag2==0)begin
+data3<=s;
+wraddress3<=wraddress3+1;
+rdaddress<=rdaddress+1;
+state<=NEXT4;
+end
+else begin
+rdaddress<=initial_rdaddress+x;
+initial_rdaddress<=initial_rdaddress+x;
+channel_cnt<=channel_cnt+1;
+state<=NEXT5;
+flag1<=0;
+end
+end
+
+NEXT5:begin
+average<=0;
+cnt_read1<=0;
+flag1<=0;
+temp[0]<=0;
+temp[1]<=0;
+temp[2]<=0;
+temp[3]<=0;
+temp[4]<=0;
+wraddress3<=wraddress3+1;
+if(channel_cnt<=7)
+state<=NEXT;
+else
+state<=READ_DONE_HIGH;
+end
+
+READ_DONE_HIGH:begin
+read_done<=1;
+state<=READ_ENABLE_LOW;
+end
+
+READ_ENABLE_LOW:begin
+read_enable<=0;
+state<=READ_DONE_LOW;
+end
+
+READ_DONE_LOW:begin
+read_done<=0;
+state<=NEXT8;
+end
+
+NEXT8:begin
+if(read_done2==1)
+state<=START;
+else
+state<=NEXT8;
+end
+
+endcase
+end
+end
+
+always @(posedge wrclk,posedge rst_1)begin
+if(rst_1)begin
+cnt_read3<=0;
+wraddress2<=0;
+read_enable3<=0;
+state_2<=CONDITION;
+end
+
+else if(wrclk)begin
+case(state_2)
+
+CONDITION:begin
+if(flag1==1)begin
+state_2<=STATE;
+end
+else
+state_2<=CONDITION;
+end
+
+STATE:begin
+state_2<=STATE2;
+read_enable3<=1;
+if(initial_roi_wraddress3>=5)
+rdaddress3<=initial_roi_wraddress3-4;
+else
+rdaddress3<=initial_roi_wraddress3+4;
+end
+
+STATE2:begin
+write_enable2<=1;
+rdaddress3<=rdaddress3+1;
+state_2<=STATE3;
+end
+
+STATE3:begin
+rdaddress3<=rdaddress3+1;
+state_2<=STATE4;
+end
+
+STATE4:begin
+data2<=s3;
+rdaddress3<=rdaddress3+1;
+state_2<=STATE5;
+end
+
+STATE5:begin
+if(cnt_read3<29)begin
+data2<=s3;
+wraddress2<=wraddress2+1;
+rdaddress3<=rdaddress3+1;
+cnt_read3<=cnt_read3+1;
+state_2<=STATE5;
+end
+else begin
+state_2<=STATE6;
+flag2<=1;
+end
+end
+
+STATE6:begin
+state_2<=STATE7;
+cnt_read3<=0;
+wraddress2<=wraddress2+1;
+end
+
+STATE7:begin
+state_2<=STATE8;
+end
+
+STATE8:begin
+flag2<=0;
+state_2<=CONDITION;
+end
+
+endcase
+end
+end
+
+
+always @(posedge wrclk,posedge rst_1)begin
+
+       if(rst_1)begin
+           rdaddress2<=0;
+           read_done2<=0;
+           read_enable2<=0;
+           cnt_read2<=0;
+           cnt_idle2<=0;
+           state_3<=CONDITION1_READ2;
+           end
+           
+      
+       else if(wrclk)begin
+       case(state_3)
+       
+           CONDITION1_READ2:begin
+           rdaddress2<=0;
+           read_done2<=0;
+           read_enable2<=0;
+           cnt_read2<=0;
+           cnt_idle2<=0;
+           if(read_done==1)
+           state_3<=CONDITION2_READ2;
+           else
+           state_3<=CONDITION1_READ2;
+           end
+           
+           CONDITION2_READ2:begin
+           if(start_rd2==1)
+           state_3<=READ_ENABLE2_HIGH;
+           else
+           state_3<=CONDITION2_READ2;
+           end
+           
+           READ_ENABLE2_HIGH:begin
+           read_enable2<=1;
+           state_3<=READ_2;
+           end
+            
+           READ_2:begin
+           if(cnt_read2<240)begin
+           rdaddress2<=rdaddress2+1;
+           cnt_read2<=cnt_read2+1;
+           state_3<=READ_2;
+           end
+           else
+           state_3<=IDLE2;
+           end
+      
+           IDLE2:begin
+           if(cnt_idle2<1)begin
+           cnt_idle2<=cnt_idle2+1;
+           state_3<=IDLE2;
+           end
+           else
+           state_3<=READ_DONE2_HIGH;
+           end
+           
+           READ_DONE2_HIGH:begin
+           read_done2<=1;
+           state_3<=READ_ENABLE2_LOW;
+           end
+           
+           READ_ENABLE2_LOW:begin
+           read_enable2<=0;
+           state_3<=READ_DONE2_LOW;
+           end
+           
+           READ_DONE2_LOW:begin
+           read_done2<=0;
+           state_3<=CONDITION1_READ2;
+           end
+           
+       endcase
+       end
+end
+
+assign q = ^s;
+assign q2 = ^s2;
+assign q3 =^ s3;
+
+blk_mem_gen_0 dut1(
+  .clka(wrclk),    // input wire clka
+  .wea(write_enable),      // input wire [0 : 0] wea
+  .addra(wraddress),  // input wire [9 : 0] addra
+  .dina(data),    // input wire [15 : 0] dina
+  .clkb(wrclk),    // input wire clkb
+  .enb(read_enable),      // input wire enb
+  .addrb(rdaddress),  // input wire [9 : 0] addrb
+  .doutb(s)  // output wire [15 : 0] doutb
+);
+
+blk_mem_gen_1 dut2(
+  .clka(wrclk),    // input wire clka
+  .wea(write_enable2),      // input wire [0 : 0] wea
+  .addra(wraddress2),  // input wire [8 : 0] addra
+  .dina(data2),    // input wire [15 : 0] dina
+  .clkb(wrclk),    // input wire clkb
+  .enb(read_enable2),      // input wire enb
+  .addrb(rdaddress2),  // input wire [8 : 0] addrb
+  .doutb(s2)  // output wire [15 : 0] doutb
+);
+
+blk_mem_gen_2 dut3 (
+  .clka(wrclk),    // input wire clka
+  .wea(write_enable3),      // input wire [0 : 0] wea
+  .addra(wraddress3),  // input wire [2 : 0] addra
+  .dina(data3),    // input wire [15 : 0] dina
+  .clkb(wrclk),    // input wire clkb
+  .enb(read_enable3),      // input wire enb
+  .addrb(rdaddress3),  // input wire [2 : 0] addrb
+  .doutb(s3)  // output wire [15 : 0] doutb
+);
+
+endmodule
