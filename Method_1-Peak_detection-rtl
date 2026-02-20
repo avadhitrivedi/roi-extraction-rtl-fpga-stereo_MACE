@@ -1,0 +1,362 @@
+module method1(input wrclk_p,
+input wrclk_n,
+input rst_1,
+input start_rd,
+input start_rd2,
+output q,
+output q2
+);
+
+wire[15:0] s;
+wire[15:0] s2;
+reg[15:0] data=0;  
+reg[15:0] data2=0; 
+reg[15:0] max=0;
+
+reg[9:0] wraddress=0;
+reg[9:0] rdaddress=0; 
+reg[9:0] initial_roi_address =0;
+reg[9:0] max_address=0;
+reg[9:0] store_rdaddress=0;
+reg[8:0] wraddress2=0;
+reg[8:0] rdaddress2=0;
+
+reg[4:0] state_2;
+reg[3:0] state_3;
+
+reg read_done=0;
+reg read_done2=0;
+
+reg write_enable=0;
+reg read_enable=0;
+reg write_enable2=0;
+reg read_enable2=0;
+
+reg[10:0] cnt_write=0;
+reg[10:0] cnt_read=0;
+reg[5:0] cnt_write2=0;
+reg[8:0] cnt_read2=0;
+reg[3:0] channel_cnt=0;
+reg[1:0] cnt_idle=0;
+reg[1:0] cnt_idle2=0;
+
+
+parameter   CONDITION1_READ=5'b00000,
+            STATE=5'b00001,
+            STATE2=5'b00010,
+            STATE3=5'b00011,
+            STATE4=5'b00100,
+            NEXT5=5'b00111,
+            COMPARE_CHANNEL_CNT=5'b01100,
+            NEXT4=5'b01110,
+            READ_DONE_HIGH=5'b01111,
+            READ_ENABLE_LOW=5'b10000,
+            READ_DONE_LOW=5'b10001,
+            WAIT_FOR_READ_DONE2=5'b10010,
+            NEXT=5'b10011,
+            NEXT2=5'b10100,
+            NEXT3=5'b10101,
+            STATE5=5'b10110;
+            
+parameter   CONDITION1_READ2=4'b0000,
+            CONDITION2_READ2=4'b0001,
+            READ_ENABLE2_HIGH=4'b0010,
+            READ_2=4'b0011,
+            IDLE2=4'b0100,
+            READ_DONE2_HIGH=4'b0101,
+            READ_ENABLE2_LOW=4'b0110,
+            READ_DONE2_LOW=4'b0111;
+
+parameter   x = 16'b0000000000001111;
+
+wire wrclk;
+IBUFDS clkin1_buf
+  (.O  (wrclk),
+   .I  (wrclk_p),
+   .IB (wrclk_n));
+
+ila_0 dut1 (
+	.clk(wrclk), // input wire clk
+
+
+	.probe0(rst_1), // input wire [0:0]  probe0  
+	.probe1(start_rd), // input wire [0:0]  probe1 
+	.probe2(start_rd2), // input wire [0:0]  probe2 
+	.probe3(s), // input wire [15:0]  probe3 
+	.probe4(s2), // input wire [15:0]  probe4 
+	.probe5(data2), // input wire [15:0]  probe5 
+	.probe6(max), // input wire [15:0]  probe6 
+	.probe7(rdaddress), // input wire [9:0]  probe7 
+	.probe8(initial_roi_address), // input wire [9:0]  probe8 
+	.probe9(max_address), // input wire [9:0]  probe9 
+	.probe10(store_rdaddress), // input wire [9:0]  probe10 
+	.probe11(wraddress2), // input wire [8:0]  probe11 
+	.probe12(rdaddress2), // input wire [8:0]  probe12 
+	.probe13(state_2), // input wire [4:0]  probe13 
+	.probe14(state_3), // input wire [3:0]  probe14 
+	.probe15(channel_cnt), // input wire [3:0]  probe15 
+	.probe16(read_done), // input wire [0:0]  probe16 
+	.probe17(read_enable), // input wire [0:0]  probe17 
+	.probe18(write_enable2), // input wire [0:0]  probe18 
+	.probe19(read_enable2), // input wire [0:0]  probe19 
+	.probe20(read_done2) // input wire [0:0]  probe20
+);
+
+always @(posedge wrclk,posedge rst_1)begin
+
+        if(rst_1)begin
+        rdaddress<=0;
+        wraddress2<=0;
+        read_done<=0;
+        read_enable<=0;
+        max<=0;
+        max_address<=0;
+        write_enable2<=0;
+        cnt_idle<=0;
+        store_rdaddress<=0;
+        channel_cnt<=0;
+        cnt_write2<=0;
+        initial_roi_address<=0;
+        cnt_read<=0;
+        state_2<=CONDITION1_READ;
+        end
+        
+        else  if(wrclk)begin
+        case(state_2)
+      
+        CONDITION1_READ:begin
+        rdaddress<=0;
+        wraddress2<=0;
+        read_done<=0;
+        read_enable<=0;
+        max<=0;
+        max_address<=0;
+        write_enable2<=0;
+        cnt_idle<=0;
+        store_rdaddress<=0;
+        channel_cnt<=0;
+        cnt_write2<=0;
+        initial_roi_address<=0;
+        cnt_read<=0;
+        if(start_rd==1)begin
+        read_enable<=1;
+        state_2<=STATE;
+        end
+        else
+        state_2<=CONDITION1_READ;
+        end
+        
+        STATE:begin
+        rdaddress<=rdaddress+1;
+        state_2<=STATE2;
+        end
+        
+        STATE2:begin
+        rdaddress<=rdaddress+1;
+        cnt_read<=cnt_read+1;
+        if(cnt_read<117)
+        state_2<=STATE3;
+        else begin
+        initial_roi_address<=max_address-x+1;
+        state_2<=STATE4;
+        end
+        end
+       
+        STATE3:begin
+        state_2<=STATE2;
+        if(s>=max)begin
+        max<=s;
+        max_address<=rdaddress;
+        end
+        else begin
+        max<=max;
+        max_address<=max_address;
+        end
+        end
+    
+       STATE4:begin
+       store_rdaddress<=rdaddress;
+       rdaddress<=initial_roi_address;
+       write_enable2<=1;
+       state_2<=NEXT;                 
+       end
+       
+       NEXT:begin
+       rdaddress<=rdaddress+1;
+       state_2<=NEXT2;
+       end
+       
+       NEXT2:begin
+       rdaddress<=rdaddress+1;
+       state_2<=NEXT3;
+       end
+       
+       NEXT3:begin
+       data2<=s;
+       rdaddress<=rdaddress+1;
+       state_2<=NEXT5;
+       end
+       
+       NEXT5:begin
+       if(cnt_write2<29)begin
+       wraddress2<=wraddress2+1;
+       data2<=s;
+       state_2<=NEXT5;
+       cnt_write2<=cnt_write2+1;
+       rdaddress<=rdaddress+1;
+       end
+       else
+       state_2<=STATE5;
+       end
+       
+       STATE5:begin
+       write_enable2<=0;
+       rdaddress<=store_rdaddress;
+       channel_cnt<=channel_cnt+1;
+       state_2<=COMPARE_CHANNEL_CNT;
+       end
+      
+       COMPARE_CHANNEL_CNT:begin
+       if(channel_cnt<8)begin
+       max_address<=0;
+       max<=0;
+       cnt_read<=0;
+       cnt_write2<=0;
+       wraddress2<=wraddress2+1;
+       state_2<=STATE;
+       end
+       else begin
+       state_2<=NEXT4;
+       end
+       end
+       
+       NEXT4:begin
+       read_done<=1;
+       state_2<=READ_ENABLE_LOW;
+       end
+              
+       READ_ENABLE_LOW:begin
+       read_enable<=0;
+       state_2<=READ_DONE_LOW;
+       end
+       
+       READ_DONE_LOW:begin
+       read_done<=0;
+       state_2<=WAIT_FOR_READ_DONE2;
+       end
+       
+       WAIT_FOR_READ_DONE2:begin
+       if(read_done2==1)
+       state_2<=CONDITION1_READ;
+       else
+       state_2<=WAIT_FOR_READ_DONE2;
+       end
+       
+       endcase
+       end
+end
+
+always @(posedge wrclk,posedge rst_1)begin
+
+       if(rst_1)begin
+       rdaddress2<=0;
+       read_done2<=0;
+       read_enable2<=0;
+       cnt_read2<=0;
+       cnt_idle2<=0;
+       state_3<=CONDITION1_READ2;
+       end
+       
+       
+       else if(wrclk)begin
+       case(state_3)
+       
+           CONDITION1_READ2:begin
+           rdaddress2<=0;
+           read_done2<=0;
+           read_enable2<=0;
+           cnt_read2<=0;
+           cnt_idle2<=0;
+           if(read_done==1)
+           state_3<=CONDITION2_READ2;
+           else
+           state_3<=CONDITION1_READ2;
+           end
+           
+            CONDITION2_READ2:begin
+            if(start_rd2==1)
+            state_3<=READ_ENABLE2_HIGH;
+            else
+            state_3<=CONDITION2_READ2;
+            end
+           
+            READ_ENABLE2_HIGH:begin
+            read_enable2<=1;
+            state_3<=READ_2;
+            end
+            
+            READ_2:begin
+            if(cnt_read2<240)begin
+            rdaddress2<=rdaddress2+1;
+            cnt_read2<=cnt_read2+1;
+            state_3<=READ_2;
+            end
+            else
+            state_3<=IDLE2;
+            end
+      
+           IDLE2:begin
+           if(cnt_idle2<1)begin
+           cnt_idle2<=cnt_idle2+1;
+           state_3<=IDLE2;
+           end
+           else
+           state_3<=READ_DONE2_HIGH;
+           end
+           
+           READ_DONE2_HIGH:begin
+           read_done2<=1;
+           state_3<=READ_ENABLE2_LOW;
+           end
+           
+           READ_ENABLE2_LOW:begin
+           read_enable2<=0;
+           state_3<=READ_DONE2_LOW;
+           end
+           
+           READ_DONE2_LOW:begin
+           read_done2<=0;
+           state_3<=CONDITION1_READ2;
+           end
+           
+       endcase
+       end
+end
+
+assign q = ^s;
+assign q2 = ^s2;
+
+blk_mem_gen_0 dut2(
+  .clka(wrclk),    // input wire clka
+  .wea(write_enable),      // input wire [0 : 0] wea
+  .addra(wraddress),  // input wire [9 : 0] addra
+  .dina(data),    // input wire [15 : 0] dina
+  .clkb(wrclk),    // input wire clkb
+  .enb(read_enable),      // input wire enb
+  .addrb(rdaddress),  // input wire [9 : 0] addrb
+  .doutb(s)  // output wire [15 : 0] doutb
+);
+
+blk_mem_gen_1 dut3 (
+  .clka(wrclk),    // input wire clka
+  .wea(write_enable2),      // input wire [0 : 0] wea
+  .addra(wraddress2),  // input wire [8 : 0] addra
+  .dina(data2),    // input wire [15 : 0] dina
+  .clkb(wrclk),    // input wire clkb
+  .enb(read_enable2),      // input wire enb
+  .addrb(rdaddress2),  // input wire [8 : 0] addrb
+  .doutb(s2)  // output wire [15 : 0] doutb
+);
+
+endmodule
+
